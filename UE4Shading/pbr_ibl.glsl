@@ -33,6 +33,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 uniform bool UseUE4Shading = true;
 
+float rcp( float x )
+{
+	return 1.0 / x;
+}
+
 vec3 saturate( vec3 x )
 {
 	return clamp( x, 0, 1 );
