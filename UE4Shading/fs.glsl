@@ -59,7 +59,7 @@ uniform float tessellationFactor = 4.0;
 uniform float heightMapScale = 1.0;
 uniform bool flipY = true;
 uniform bool perFragBinormal = true;
-uniform bool sRGBBaseColor = true;
+uniform bool sRGBBaseColor = false;
 
 uniform sampler2D heightMap;
 uniform sampler2D normalMap;
@@ -105,7 +105,6 @@ float fit_roughness(float r)
 }
 
 // ACES Tonemapping
-
 vec3 tonemapSCurve(vec3 x)
 {
   	float a = 2.51f;
@@ -184,6 +183,7 @@ void main()
 		baseColor = srgb_to_linear(baseColor);
 
 
+
 	float metallic = get2DSample(metallicMap, uv, disableFragment, cDefaultColor.mMetallic).r;
 	float roughness = get2DSample(roughnessMap, uv, disableFragment, cDefaultColor.mRoughness).r;
 	roughness = max(minRoughness, fit_roughness(roughness));
@@ -251,9 +251,9 @@ void main()
 	
 	if ( UseACES )
 	{
-		finalColor = pow(finalColor, vec3(2.2));
+		//finalColor = pow(finalColor, vec3(2.2));
 		finalColor = tonemapSCurve(finalColor);
-		finalColor = pow(finalColor, vec3(1.0/2.2));
+		//finalColor = pow(finalColor, vec3(1.0/2.2));
 	}
 	
 	// Final Color
