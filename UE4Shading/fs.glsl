@@ -59,7 +59,7 @@ uniform float tessellationFactor = 4.0;
 uniform float heightMapScale = 1.0;
 uniform bool flipY = true;
 uniform bool perFragBinormal = true;
-uniform bool sRGBBaseColor = false;
+uniform bool sRGBBaseColor = true;
 
 uniform sampler2D heightMap;
 uniform sampler2D normalMap;
