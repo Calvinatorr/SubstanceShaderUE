@@ -157,22 +157,6 @@ vec3 microfacets_brdf(
 		return fresnel(vdh,Ks) * ( normal_distrib(ndh,Roughness) * visibility(ndl,ndv,Roughness) / 4.0 );
 }
 
-vec3 microfacets_contrib(
-	float vdh,
-	float ndh,
-	float ndl,
-	float ndv,
-	vec3 Ks,
-	float Roughness)
-{
-// This is the contribution when using importance sampling with the GGX based
-// sample distribution. This means ct_contrib = ct_brdf / ggx_probability
-	
-	if ( UseUE4Shading )
-		return fresnel(vdh,Ks) * (visibility(ndl,ndv,Roughness) * vdh * ndl / ndh );
-	else
-		return fresnel(vdh,Ks) * (visibility(ndl,ndv,Roughness) * vdh * ndl / ndh );
-}
 
 vec3 diffuse_brdf(
 	vec3 Nn,
@@ -219,6 +203,66 @@ float probabilityGGX(float ndh, float vdh, float Roughness)
 		return normal_distrib(ndh, Roughness) * ndh / (4.0*vdh);
 }
 
+vec3 lightContribution(
+	vec3 fixedNormalWS,
+	vec3 pointToLightDirWS,
+	vec3 pointToCameraDirWS,
+	vec3 diffColor,
+	vec3 specColor,
+	float roughness,
+	vec3 LampColor,
+	float LampIntensity)
+{
+		// Note that the lamp intensity is using ˝computer games units" i.e. it needs
+	// to be multiplied by M_PI.
+	// Cf https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+
+	return  max(dot(fixedNormalWS,pointToLightDirWS), 0.0)
+	* ((diffuse_brdf(
+			fixedNormalWS,
+			pointToLightDirWS,
+			pointToCameraDirWS,
+			diffColor*(vec3(1.0,1.0,1.0)-specColor))
+		+ microfacets_brdf(
+			fixedNormalWS,
+			pointToLightDirWS,
+			pointToCameraDirWS,
+			specColor,
+			roughness) )
+		* LampColor * LampIntensity * M_PI);
+}
+
+vec3 pointLightContribution(
+	vec3 fixedNormalWS,
+	vec3 pointToLightDirWS,
+	vec3 pointToCameraDirWS,
+	vec3 diffColor,
+	vec3 specColor,
+	float roughness,
+	vec3 LampColor,
+	float LampIntensity,
+	float LampDist)
+{
+	return lightContribution(fixedNormalWS, pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, LampColor, LampIntensity)
+		* lampAttenuation(LampDist);
+}
+
+vec3 dirLightContribution(
+	vec3 fixedNormalWS,
+	vec3 pointToLightDirWS,
+	vec3 pointToCameraDirWS,
+	vec3 diffColor,
+	vec3 specColor,
+	float roughness,
+	vec3 LampColor,
+	float LampIntensity)
+{
+	return lightContribution(fixedNormalWS, -pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, LampColor, LampIntensity);
+}
+
+//////////////////////////////////////////////////////////////////// IBL ///////////////////////////////////////////////////////////////////////////////////
+
+
 float distortion(vec3 Wn)
 {
 	// Computes the inverse of the solid angle of the (differential) pixel in
@@ -243,61 +287,40 @@ vec3 samplePanoramicLOD(sampler2D map, vec3 dir, float lod)
 	return textureLod(map, pos, lod).rgb;
 }
 
-vec3 pointLightContribution(
-	vec3 fixedNormalWS,
-	vec3 pointToLightDirWS,
-	vec3 pointToCameraDirWS,
-	vec3 diffColor,
-	vec3 specColor,
-	float roughness,
-	vec3 LampColor,
-	float LampIntensity,
-	float LampDist)
+// Added by Calvin
+vec3 EnvBRDFApprox( vec3 SpecularColor, float Roughness, float NoV )
 {
-	// Note that the lamp intensity is using ˝computer games units" i.e. it needs
-	// to be multiplied by M_PI.
-	// Cf https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+	// [ Lazarov 2013, "Getting More Physical in Call of Duty: Black Ops II" ]
+	// Adaptation to fit our G term.
+	const vec4 c0 = { -1, -0.0275, -0.572, 0.022 };
+	const vec4 c1 = { 1, 0.0425, 1.04, -0.04 };
+	vec4 r = Roughness * c0 + c1;
+	float a004 = min( r.x * r.x, exp2( -9.28 * NoV ) ) * r.x + r.y;
+	vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
 
-	return  max(dot(fixedNormalWS,pointToLightDirWS), 0.0) * ( (
-		diffuse_brdf(
-			fixedNormalWS,
-			pointToLightDirWS,
-			pointToCameraDirWS,
-			diffColor*(vec3(1.0,1.0,1.0)-specColor))
-		+ microfacets_brdf(
-			fixedNormalWS,
-			pointToLightDirWS,
-			pointToCameraDirWS,
-			specColor,
-			roughness) ) *LampColor*(lampAttenuation(LampDist)*LampIntensity*M_PI) );
+	// Anything less than 2% is physically impossible and is instead considered to be shadowing
+	// Note: this is needed for the 'specular' show flag to work, since it uses a SpecularColor of 0
+	AB.y *= saturate( 50.0 * SpecularColor.g );
+
+	return SpecularColor * AB.x + AB.y;
 }
+// End
 
-vec3 dirLightContribution(
-	vec3 fixedNormalWS,
-	vec3 pointToLightDirWS,
-	vec3 pointToCameraDirWS,
-	vec3 diffColor,
-	vec3 specColor,
-	float roughness,
-	vec3 LampColor,
-	float LampIntensity)
+vec3 microfacets_contrib(
+	float vdh,
+	float ndh,
+	float ndl,
+	float ndv,
+	vec3 Ks,
+	float Roughness)
 {
-	// Note that the lamp intensity is using ˝computer games units" i.e. it needs
-	// to be multiplied by M_PI.
-	// Cf https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-
-	return  max(dot(fixedNormalWS,pointToLightDirWS), 0.0) * ( (
-		diffuse_brdf(
-			fixedNormalWS,
-			pointToLightDirWS,
-			pointToCameraDirWS,
-			diffColor*(vec3(1.0,1.0,1.0)-specColor))
-		+ microfacets_brdf(
-			fixedNormalWS,
-			pointToLightDirWS,
-			pointToCameraDirWS,
-			specColor,
-			roughness) ) *LampColor*(LampIntensity*M_PI) );
+// This is the contribution when using importance sampling with the GGX based
+// sample distribution. This means ct_contrib = ct_brdf / ggx_probability
+	
+	if ( UseUE4Shading )
+		return EnvBRDFApprox( Ks, Roughness, ndv );
+	else
+		return fresnel(vdh,Ks) * (visibility(ndl,ndv,Roughness) * vdh * ndl / ndh );
 }
 
 void computeSamplingFrame(
@@ -322,26 +345,6 @@ vec2 fibonacci2D(int i, int nbSample)
 	);
 }
 
-// Added by Calvin
-
-vec3 EnvBRDFApprox( vec3 SpecularColor, float Roughness, float NoV )
-{
-	// [ Lazarov 2013, "Getting More Physical in Call of Duty: Black Ops II" ]
-	// Adaptation to fit our G term.
-	const vec4 c0 = { -1, -0.0275, -0.572, 0.022 };
-	const vec4 c1 = { 1, 0.0425, 1.04, -0.04 };
-	vec4 r = Roughness * c0 + c1;
-	float a004 = min( r.x * r.x, exp2( -9.28 * NoV ) ) * r.x + r.y;
-	vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
-
-	// Anything less than 2% is physically impossible and is instead considered to be shadowing
-	// Note: this is needed for the 'specular' show flag to work, since it uses a SpecularColor of 0
-	AB.y *= saturate( 50.0 * SpecularColor.g );
-
-	return SpecularColor * AB.x + AB.y;
-}
-
-// End
 
 vec3 IBLSpecularContribution(
 	sampler2D environmentMap,
@@ -382,14 +385,8 @@ vec3 IBLSpecularContribution(
 				probabilityGGX(ndh, vdh, roughness),
 				nbSamples,
 				maxLod);
-		sum +=
-			samplePanoramicLOD(environmentMap,rotate(Ln,envRotation),lodS) *
-			//EnvBRDFApprox( specColor, roughness, ndv )
-			microfacets_contrib(
-				vdh, ndh, ndl, ndv,
-				specColor,
-				roughness)
-				* horiz;
+		
+		sum += samplePanoramicLOD(environmentMap,rotate(Ln,envRotation),lodS) * microfacets_contrib( vdh, ndh, ndl, ndv, specColor, roughness) * horiz;
 	}
 
 	return sum / nbSamples;
@@ -431,3 +428,5 @@ vec3 computeIBL(
 
 	return result * ambientOcclusion;
 }
+
+//////////////////////////////////////////////////////////////////// END IBL ///////////////////////////////////////////////////////////////////////////////////
