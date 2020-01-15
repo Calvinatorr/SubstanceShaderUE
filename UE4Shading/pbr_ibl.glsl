@@ -288,12 +288,14 @@ vec3 samplePanoramicLOD(sampler2D map, vec3 dir, float lod)
 }
 
 // Added by Calvin
+
+// Ported from Unreal Engine 4.23. Property of Epic Games.
 vec3 EnvBRDFApprox( vec3 SpecularColor, float Roughness, float NoV )
 {
 	// [ Lazarov 2013, "Getting More Physical in Call of Duty: Black Ops II" ]
 	// Adaptation to fit our G term.
-	const vec4 c0 = { -1, -0.0275, -0.572, 0.022 };
-	const vec4 c1 = { 1, 0.0425, 1.04, -0.04 };
+	const vec4 c0 = vec4( -1, -0.0275, -0.572, 0.022 );
+	const vec4 c1 = vec4( 1, 0.0425, 1.04, -0.04 );
 	vec4 r = Roughness * c0 + c1;
 	float a004 = min( r.x * r.x, exp2( -9.28 * NoV ) ) * r.x + r.y;
 	vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
