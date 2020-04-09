@@ -72,6 +72,10 @@ uniform sampler2D specularLevel;
 uniform sampler2D opacityMap;
 uniform sampler2D environmentMap;
 
+uniform sampler2D clothMap;
+uniform sampler2D fuzzColourMap;
+
+
 uniform mat4 viewInverseMatrix;
 
 // Number of miplevels in the envmap
@@ -190,7 +194,14 @@ void main()
 
 	vec3 diffColor = baseColor * (1.0 - metallic);
 	vec3 specColor = mix(dielectricColor, baseColor, metallic);
-
+	
+	// ------------------------------------------
+	// Get cloth parameters
+	float Cloth 		= clamp( get2DSample(clothMap, uv, disableFragment, cDefaultColor.mMetallic).r, 0, 1 );
+	vec3 FuzzColour 	= get2DSample(fuzzColourMap, uv, disableFragment, cDefaultColor.mBaseColor).rgb;
+	//FuzzColour = srgb_to_linear(FuzzColour);
+	
+	
 	// ------------------------------------------
 	// Compute point lights contributions
 	vec3 contrib0 = pointLightContribution(
@@ -200,6 +211,8 @@ void main()
 			diffColor,
 			specColor,
 			roughness,
+			Cloth,
+			FuzzColour,
 			Lamp0Color,
 			Lamp0Intensity,
 			pointToLight0Length );
@@ -210,6 +223,8 @@ void main()
 			diffColor,
 			specColor,
 			roughness,
+			Cloth,
+			FuzzColour,
 			Lamp1Color,
 			Lamp1Intensity,
 			pointToLight1Length );
@@ -220,6 +235,8 @@ void main()
 			diffColor,
 			specColor,
 			roughness,
+			Cloth,
+			FuzzColour,
 			LightColour,
 			LightIntensity );
 
@@ -233,7 +250,8 @@ void main()
 		normalWS, fixedNormalWS, tangentWS, binormalWS,
 		pointToCameraDirWS,
 		diffColor, specColor, roughness,
-		AmbiIntensity * ao);
+		AmbiIntensity * ao,
+		metallic, Cloth, FuzzColour);
 
 	// ------------------------------------------
 	//Emissive

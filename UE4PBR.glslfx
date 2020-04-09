@@ -56,6 +56,8 @@
     <sampler name="specularLevel"   usage="specularlevel"/>
     <sampler name="opacityMap"      usage="opacity"/>
     <sampler name="environmentMap"  usage="panorama"/>
+    <sampler name="clothMap"  		usage="mask"/>
+    <sampler name="fuzzColourMap"  	usage="transmissive"/>
 
     <!-- MATRICES -->
     <uniform name="worldMatrix"                 semantic="world"/>
@@ -101,8 +103,8 @@
 	<uniform name="UseACES"     	  guiGroup="Shading"     guiName="Use ACES Tonemapping"   default="true"      guiWidget="checkbox" />
 	
 	<uniform name="UseDirLight"       guiGroup="Directional Light"     guiName="Use Directional Light"        default="false"      guiWidget="checkbox" />
-	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        default="-1 -1 -1" guiMin="-1"  guiMax="1" guiWidget="slider3" />
-	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        default="1 1 1"      guiWidget="color" />
+	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        default="-1" guiMin="-1"  guiMax="1" guiWidget="slider3" />
+	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        default="3.142"      guiWidget="color" />
 	<uniform name="LightIntensity"    guiGroup="Directional Light"     guiName="Light Intensity"     default="1"  guiMin="0"  guiMax="20"      	  guiWidget="slider" />
 
 </glslfx>

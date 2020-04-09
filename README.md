@@ -14,3 +14,13 @@ Installation steps:
    
 (optional) Set shader as your default 3D VIEW shader.
    Edit>Preferences>PROJECTS>Project>3D View>Default shader <- point this to UE4PBR.glslfx in that folder.
+
+   
+
+   
+Cloth BxDF - Charlie distribution term & Ashkimin visibility term
+
+*It is recommended to enable the directional light to correctly view the falloff
+
+1. Cloth (mask usage)				 - Blends between default lit microfacet BRDF & cloth microfuzz BRDF
+2. Fuzz Colour (transmissive usage)	 - Reflectance of fibres

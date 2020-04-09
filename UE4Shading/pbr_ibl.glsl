@@ -48,17 +48,26 @@ float saturate ( float x )
 	return clamp( x, 0, 1 );	
 }
 
+vec3 Square( vec3 x )
+{
+	return vec3(x.x*x.x, x.y*x.y, x.z*x.z);
+}
+
 // [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
 vec3 F_Schlick( vec3 SpecularColor, float VoH )
 {
 	//float Fc = Pow5( 1 - VoH );					// 1 sub, 3 mul
 	//return Fc + (1 - Fc) * SpecularColor;		// 1 add, 3 mad
 	float Fc = 1.0 - VoH;
-	Fc = Fc * Fc * Fc * Fc * Fc; // Pow5
+	Fc = Fc*Fc;
+	Fc = Fc*Fc;
+	Fc = Fc*Fc;
+	Fc = Fc*Fc;
+	//Fc = Fc * Fc * Fc * Fc * Fc; // Pow5
 	
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing
 	//return clamp( 50.0 * SpecularColor.g, 0, 1 ) * Fc + (1 - Fc) * SpecularColor;
-	return saturate( 50.0 * SpecularColor ) * Fc + (1.0 - Fc) * SpecularColor;
+	return saturate( 50.0f * SpecularColor.g ) * Fc + (1.0f - Fc) * SpecularColor;
 	
 }
 
@@ -88,6 +97,28 @@ float Vis_SmithJointApprox( float a2, float NoV, float NoL )
 	float Vis_SmithL = NoV * ( NoL * ( 1 - a ) + a );
 	return 0.5 * rcp( Vis_SmithV + Vis_SmithL );
 }
+
+float CharlieD(float Roughness, float NoH)
+{
+	float invR = 1.0f / Roughness;
+	float cos2h = NoH * NoH;
+	float sin2h = 1.0f - cos2h; // Trig identity
+	return (2.0f * invR) * pow(sin2h, invR * 0.5f) / (2.0f*PI);
+}
+
+float D_InvGGX( float a2, float NoH )
+{
+	float A = 4;
+	float d = ( NoH - a2 * NoH ) * NoH + a2;
+	return rcp( PI * (1 + A*a2) ) * ( 1 + 4 * a2*a2 / ( d*d ) );
+}
+
+float AshikhminV(float NoV, float NoL)
+{
+	// Give inverse denominator
+    return 1.0f / (4.0f * (NoL + NoV - NoL * NoV));
+}
+
 
 // End here
 
@@ -139,22 +170,44 @@ vec3 microfacets_brdf(
 	vec3 Ln,
 	vec3 Vn,
 	vec3 Ks,
-	float Roughness)
+	float Roughness,
+	float Cloth,
+	vec3 FuzzColour)
 {
 	vec3 Hn = normalize(Vn + Ln);
+	
 	float vdh = max( 0.0, dot(Vn, Hn) );
+	float vdl = max( 0.0, dot(Vn, Ln) );
 	float ndh = max( 0.0, dot(Nn, Hn) );
 	float ndl = max( 0.0, dot(Nn, Ln) );
 	float ndv = max( 0.0, dot(Nn, Vn) );
+	ndv = saturate( abs( ndv) + 1e-5 );
 	
 	if ( UseUE4Shading )
 	{
 		float a = Roughness * Roughness;
 		float a2 = a*a;
-		return F_Schlick(Ks, vdh) * ( D_GGX( a2, ndh ) * Vis_Smith( Roughness * Roughness, ndv, ndl ) / 4.0 );
+		
+		
+		// Default lit
+		vec3 F =  F_Schlick( Ks, vdh );
+		float D = D_GGX( a2, ndh );
+		float Vis = Vis_SmithJointApprox( a, ndv, ndl ) / 4.0f;
+		vec3 DefaultLitSpecular = F * ( D * Vis );
+		
+		// Cloth
+		vec3 Cloth_F = F_Schlick( FuzzColour, vdh );
+		float Cloth_D = D_InvGGX( a2, ndh );
+		float Cloth_Vis = AshikhminV( ndv, ndl );
+		vec3 ClothSpecular = Cloth_F * ( Cloth_D * Cloth_Vis );// * ndl;
+		//ClothSpecular = vec3(ndl);
+		
+		return mix(DefaultLitSpecular, ClothSpecular, Cloth);
 	}
 	else
+	{
 		return fresnel(vdh,Ks) * ( normal_distrib(ndh,Roughness) * visibility(ndl,ndv,Roughness) / 4.0 );
+	}
 }
 
 
@@ -210,25 +263,30 @@ vec3 lightContribution(
 	vec3 diffColor,
 	vec3 specColor,
 	float roughness,
+	float Cloth,
+	vec3 FuzzColour,
 	vec3 LampColor,
 	float LampIntensity)
 {
-		// Note that the lamp intensity is using ˝computer games units" i.e. it needs
+	// Note that the lamp intensity is using ˝computer games units" i.e. it needs
 	// to be multiplied by M_PI.
 	// Cf https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-
+	
 	return  max(dot(fixedNormalWS,pointToLightDirWS), 0.0)
 	* ((diffuse_brdf(
 			fixedNormalWS,
 			pointToLightDirWS,
 			pointToCameraDirWS,
-			diffColor*(vec3(1.0,1.0,1.0)-specColor))
+			//diffColor*(vec3(1.0,1.0,1.0)-specColor))
+			diffColor)
 		+ microfacets_brdf(
 			fixedNormalWS,
 			pointToLightDirWS,
 			pointToCameraDirWS,
 			specColor,
-			roughness) )
+			roughness,
+			Cloth,
+			FuzzColour) )
 		* LampColor * LampIntensity * M_PI);
 }
 
@@ -239,11 +297,13 @@ vec3 pointLightContribution(
 	vec3 diffColor,
 	vec3 specColor,
 	float roughness,
+	float Cloth,
+	vec3 FuzzColour,
 	vec3 LampColor,
 	float LampIntensity,
 	float LampDist)
 {
-	return lightContribution(fixedNormalWS, pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, LampColor, LampIntensity)
+	return lightContribution(fixedNormalWS, pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, Cloth, FuzzColour, LampColor, LampIntensity)
 		* lampAttenuation(LampDist);
 }
 
@@ -254,10 +314,12 @@ vec3 dirLightContribution(
 	vec3 diffColor,
 	vec3 specColor,
 	float roughness,
+	float Cloth,
+	vec3 FuzzColour,
 	vec3 LampColor,
 	float LampIntensity)
 {
-	return lightContribution(fixedNormalWS, -pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, LampColor, LampIntensity);
+	return lightContribution(fixedNormalWS, -pointToLightDirWS, pointToCameraDirWS, diffColor, specColor, roughness, Cloth, FuzzColour, LampColor, LampIntensity);
 }
 
 //////////////////////////////////////////////////////////////////// IBL ///////////////////////////////////////////////////////////////////////////////////
@@ -407,11 +469,19 @@ vec3 computeIBL(
 	vec3 diffColor,
 	vec3 specColor,
 	float roughness,
-	float ambientOcclusion)
+	float ambientOcclusion,
+	float Metallic,
+	float Cloth,
+	vec3 FuzzColour)
 {
 	vec3 Tp,Bp;
 	computeSamplingFrame(iFS_Tangent, iFS_Binormal, fixedNormalWS, Tp, Bp);
 
+	//specColor = mix(specColor, FuzzColour, Cloth);
+	//specColor = mix(specColor, mix(specColor, FuzzColour, Metallic), Cloth);
+	specColor = mix(specColor, mix(FuzzColour*vec3(.04f), specColor, Metallic), Cloth);
+	diffColor = mix(diffColor, FuzzColour, Cloth);
+	
 	vec3 result = IBLSpecularContribution(
 		environmentMap,
 		envRotation,
@@ -425,7 +495,7 @@ vec3 computeIBL(
 		specColor,
 		roughness);
 
-	result += diffColor * (vec3(1.0,1.0,1.0)-specColor) *
+	result += diffColor *// (vec3(1.0,1.0,1.0)-specColor) *
 		irradianceFromSH(rotate(fixedNormalWS,envRotation));
 
 	return result * ambientOcclusion;
