@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Added by Calvin
 
 uniform bool UseUE4Shading = true;
+uniform bool UseBurleyDiffuse = false;
 
 float rcp( float x )
 {
@@ -210,14 +211,38 @@ vec3 microfacets_brdf(
 	}
 }
 
+float Pow5( float x )
+{
+	float xx = x*x;
+	return xx * xx * x;
+}
 
 vec3 diffuse_brdf(
 	vec3 Nn,
 	vec3 Ln,
 	vec3 Vn,
-	vec3 Kd)
+	vec3 Kd,
+	float Roughness)
 {
-	return Kd * M_INV_PI;
+	if (UseBurleyDiffuse) // [Burley 2012, "Physically-Based Shading at Disney"]
+	{
+		// Half vector
+		vec3 H = normalize(Vn + Ln);
+	
+		// Dot products
+		float NoV = max( dot(Nn, Vn), 0.0 );
+		float NoL = max( dot(Nn, Ln), 0.0 );
+		float VoH = max( dot(Vn, H ), 0.0 );
+		
+		float FD90 = 0.5 + 2 * VoH * VoH * Roughness;
+		float FdV = 1 + (FD90 - 1) * Pow5( 1 - NoV );
+		float FdL = 1 + (FD90 - 1) * Pow5( 1 - NoL );
+		return Kd * ( M_INV_PI * FdV * FdL );
+	}
+	else // Lambert
+	{
+		return Kd * M_INV_PI;
+	}
 }
 
 void computeOrtho(vec3 A, out vec3 B, out vec3 C)
@@ -278,7 +303,8 @@ vec3 lightContribution(
 			pointToLightDirWS,
 			pointToCameraDirWS,
 			//diffColor*(vec3(1.0,1.0,1.0)-specColor))
-			diffColor)
+			diffColor,
+			roughness)
 		+ microfacets_brdf(
 			fixedNormalWS,
 			pointToLightDirWS,

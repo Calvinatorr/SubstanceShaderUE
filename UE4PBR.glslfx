@@ -101,10 +101,10 @@
 	<uniform name="UseIBL"     		  guiGroup="Shading"     guiName="Use IBL"        		  default="true"      guiWidget="checkbox" />
 	<uniform name="nbSamples"         guiGroup="Shading"     guiName="Number of IBL Samples"  default="64" min="6"guiWidget="slider"  guiMin="6"  guiMax="64"/>
 	<uniform name="UseACES"     	  guiGroup="Shading"     guiName="Use ACES Tonemapping"   default="true"      guiWidget="checkbox" />
+	<uniform name="UseBurleyDiffuse"  guiGroup="Shading"     guiName="Use Burley Diffuse"     default="false"     guiWidget="checkbox" />
 	
 	<uniform name="UseDirLight"       guiGroup="Directional Light"     guiName="Use Directional Light"        default="false"      guiWidget="checkbox" />
 	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        default="-1" guiMin="-1"  guiMax="1" guiWidget="slider3" />
-	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        default="3.142"      guiWidget="color" />
 	<uniform name="LightIntensity"    guiGroup="Directional Light"     guiName="Light Intensity"     default="1"  guiMin="0"  guiMax="20"      	  guiWidget="slider" />
 
 </glslfx>
