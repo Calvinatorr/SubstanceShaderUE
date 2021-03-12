@@ -105,6 +105,7 @@
 	
 	<uniform name="UseDirLight"       guiGroup="Directional Light"     guiName="Use Directional Light"        default="false"      guiWidget="checkbox" />
 	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        default="-1" guiMin="-1"  guiMax="1" guiWidget="slider3" />
+	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        default="1 1 1"      guiWidget="color" />
 	<uniform name="LightIntensity"    guiGroup="Directional Light"     guiName="Light Intensity"     default="1"  guiMin="0"  guiMax="20"      	  guiWidget="slider" />
 
 </glslfx>
