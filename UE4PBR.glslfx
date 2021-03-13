@@ -69,12 +69,14 @@
     <uniform name="projectionMatrix"            semantic="projection"/>
 
     <!-- SCENE PARAMETERS -->
-    <uniform name="Lamp0Pos"       semantic="lightposition0"/>
-    <uniform name="Lamp0Color"     semantic="lightcolor0"/>
-    <uniform name="Lamp0Intensity" semantic="lightintensity0"/>
-    <uniform name="Lamp1Pos"       semantic="lightposition1"/>
-    <uniform name="Lamp1Color"     semantic="lightcolor1"/>
-    <uniform name="Lamp1Intensity" semantic="lightintensity1"/>
+	<uniform name="Lamp0Enabled"   semantic="light0enabled"/>
+    <uniform name="Lamp0Pos"       semantic="light0position"/>
+    <uniform name="Lamp0Color"     semantic="light0color"/>
+    <uniform name="Lamp0Intensity" semantic="light0intensity"/>
+	<uniform name="Lamp1Enabled"   semantic="light1enabled"/>
+    <uniform name="Lamp1Pos"       semantic="light1position"/>
+    <uniform name="Lamp1Color"     semantic="light1color"/>
+    <uniform name="Lamp1Intensity" semantic="light1intensity"/>
 
     <!-- MISC PARAMETERS -->
     <!--<uniform name="nbSamples"           semantic="samplespostablesize"/>-->
@@ -102,10 +104,9 @@
 	<uniform name="nbSamples"         guiGroup="Shading"     guiName="Number of IBL Samples"  default="64" min="6"guiWidget="slider"  guiMin="6"  guiMax="64"/>
 	<uniform name="UseACES"     	  guiGroup="Shading"     guiName="Use ACES Tonemapping"   default="true"      guiWidget="checkbox" />
 	<uniform name="UseBurleyDiffuse"  guiGroup="Shading"     guiName="Use Burley Diffuse"     default="false"     guiWidget="checkbox" />
-	
-	<uniform name="UseDirLight"       guiGroup="Directional Light"     guiName="Use Directional Light"        default="false"      guiWidget="checkbox" />
-	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        default="-1" guiMin="-1"  guiMax="1" guiWidget="slider3" />
-	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        default="1 1 1"      guiWidget="color" />
-	<uniform name="LightIntensity"    guiGroup="Directional Light"     guiName="Light Intensity"     default="1"  guiMin="0"  guiMax="20"      	  guiWidget="slider" />
+	<uniform name="UseDirLight"       guiGroup="Directional Light"     guiName="Use Directional Light"        	default="false"      	guiWidget="checkbox" />
+	<uniform name="LightDir"     	  guiGroup="Directional Light"     guiName="Light Direction"        		default="-1 -1 -1" 		guiMin="-1"  			guiMax="1" 	guiWidget="slider" />
+	<uniform name="LightColour"       guiGroup="Directional Light"     guiName="Light Colour"        			default="{{sRGBWorkingColorSpace==true}}"      	guiWidget="color" />
+	<uniform name="LightIntensity"    guiGroup="Directional Light"     guiName="Light Intensity"     			default="1"  			guiMin="0"  			guiMax="20" guiWidget="slider" />
 
 </glslfx>

@@ -39,9 +39,11 @@ in vec3 iFS_PointWS;
 
 out vec4 ocolor0;
 
+uniform bool Lamp0Enabled = false;
 uniform vec3 Lamp0Pos = vec3(0.0,0.0,70.0);
 uniform vec3 Lamp0Color = vec3(1.0,1.0,1.0);
 uniform float Lamp0Intensity = 1.0;
+uniform bool Lamp1Enabled = false;
 uniform vec3 Lamp1Pos = vec3(70.0,0.0,0.0);
 uniform vec3 Lamp1Color = vec3(0.198,0.198,0.198);
 uniform float Lamp1Intensity = 1.0;
@@ -204,7 +206,7 @@ void main()
 	
 	// ------------------------------------------
 	// Compute point lights contributions
-	vec3 contrib0 = pointLightContribution(
+	vec3 contrib0 = Lamp0Enabled ? pointLightContribution(
 			fixedNormalWS,
 			pointToLight0DirWS,
 			pointToCameraDirWS,
@@ -215,8 +217,8 @@ void main()
 			FuzzColour,
 			Lamp0Color,
 			Lamp0Intensity,
-			pointToLight0Length );
-	vec3 contrib1 = pointLightContribution(
+			pointToLight0Length ) : vec3(0);
+	vec3 contrib1 = Lamp1Enabled ? pointLightContribution(
 			fixedNormalWS,
 			pointToLight1DirWS,
 			pointToCameraDirWS,
@@ -227,8 +229,8 @@ void main()
 			FuzzColour,
 			Lamp1Color,
 			Lamp1Intensity,
-			pointToLight1Length );
-	vec3 dirLightContrib = dirLightContribution(
+			pointToLight1Length ) : vec3(0);
+	vec3 dirLightContrib = UseDirLight ? dirLightContribution(
 			fixedNormalWS,
 			normalize(LightDir),
 			pointToCameraDirWS,
@@ -238,7 +240,7 @@ void main()
 			Cloth,
 			FuzzColour,
 			LightColour,
-			LightIntensity );
+			LightIntensity ) : vec3(0);
 
 	// ------------------------------------------
 	// Image based lighting contribution
@@ -259,19 +261,14 @@ void main()
 	emissiveContrib = srgb_to_linear(emissiveContrib) * EmissiveIntensity;
 
 	// ------------------------------------------
-	vec3 finalColor = contrib0 + contrib1 + emissiveContrib;
+	vec3 finalColor = contrib0 + contrib1 + dirLightContrib + emissiveContrib;
 	
 	if ( UseIBL )
 		finalColor += contribE;
 	
-	if ( UseDirLight )
-		finalColor += dirLightContrib;
-	
 	if ( UseACES )
 	{
-		//finalColor = pow(finalColor, vec3(2.2));
 		finalColor = tonemapSCurve(finalColor);
-		//finalColor = pow(finalColor, vec3(1.0/2.2));
 	}
 	
 	// Final Color
