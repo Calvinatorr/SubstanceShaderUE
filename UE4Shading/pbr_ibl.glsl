@@ -54,6 +54,12 @@ vec3 Square( vec3 x )
 	return vec3(x.x*x.x, x.y*x.y, x.z*x.z);
 }
 
+float Pow5( float x )
+{
+	float xx = x*x;
+	return xx * xx * x;
+}
+
 // [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
 vec3 F_Schlick( vec3 SpecularColor, float VoH )
 {
@@ -118,6 +124,15 @@ float AshikhminV(float NoV, float NoL)
 {
 	// Give inverse denominator
     return 1.0f / (4.0f * (NoL + NoV - NoL * NoV));
+}
+
+// [Burley 2012, "Physically-Based Shading at Disney"]
+vec3 Diffuse_Burley( vec3 DiffuseColor, float Roughness, float NoV, float NoL, float VoH )
+{
+	float FD90 = 0.5 + 2 * VoH * VoH * Roughness;
+	float FdV = 1 + (FD90 - 1) * Pow5( 1 - NoV );
+	float FdL = 1 + (FD90 - 1) * Pow5( 1 - NoL );
+	return DiffuseColor * ( M_INV_PI * FdV * FdL );
 }
 
 
@@ -211,12 +226,6 @@ vec3 microfacets_brdf(
 	}
 }
 
-float Pow5( float x )
-{
-	float xx = x*x;
-	return xx * xx * x;
-}
-
 vec3 diffuse_brdf(
 	vec3 Nn,
 	vec3 Ln,
@@ -234,10 +243,7 @@ vec3 diffuse_brdf(
 		float NoL = max( dot(Nn, Ln), 0.0 );
 		float VoH = max( dot(Vn, H ), 0.0 );
 		
-		float FD90 = 0.5 + 2 * VoH * VoH * Roughness;
-		float FdV = 1 + (FD90 - 1) * Pow5( 1 - NoV );
-		float FdL = 1 + (FD90 - 1) * Pow5( 1 - NoL );
-		return Kd * ( M_INV_PI * FdV * FdL );
+		return Diffuse_Burley( Kd, Roughness, NoV, NoL, VoH );
 	}
 	else // Lambert
 	{
@@ -503,10 +509,8 @@ vec3 computeIBL(
 	vec3 Tp,Bp;
 	computeSamplingFrame(iFS_Tangent, iFS_Binormal, fixedNormalWS, Tp, Bp);
 
-	//specColor = mix(specColor, FuzzColour, Cloth);
-	//specColor = mix(specColor, mix(specColor, FuzzColour, Metallic), Cloth);
 	specColor = mix(specColor, mix(FuzzColour*vec3(.04f), specColor, Metallic), Cloth);
-	diffColor = mix(diffColor, FuzzColour, Cloth);
+	diffColor = diffColor * (1.0 - Metallic);
 	
 	vec3 result = IBLSpecularContribution(
 		environmentMap,
@@ -521,8 +525,30 @@ vec3 computeIBL(
 		specColor,
 		roughness);
 
-	result += diffColor *// (vec3(1.0,1.0,1.0)-specColor) *
-		irradianceFromSH(rotate(fixedNormalWS,envRotation));
+	// Diffuse lobe
+	if (UseBurleyDiffuse)
+	{
+		vec3 Nn = normalWS;
+		vec3 Vn = pointToCameraDirWS;
+		vec3 Ln = normalize(Vn - Nn * dot(Vn, Nn));
+		
+		// Half vector
+		vec3 H = normalize(Vn + Ln);
+	
+		// Dot products
+		float NoV = max( dot(Nn, Vn), 0.0 );
+		float NoL = max( dot(Nn, Ln), 0.0 );
+		float VoH = max( dot(Vn, H ), 0.0 );
+		
+		diffColor = Diffuse_Burley( diffColor, roughness, NoV, NoL, VoH );
+	}
+	
+	// Apply fuzz colour
+	diffColor += FuzzColour * Cloth;
+	
+	vec3 irradiance = irradianceFromSH(rotate(fixedNormalWS,envRotation));
+	result += diffColor * irradiance;
+
 
 	return result * ambientOcclusion;
 }
